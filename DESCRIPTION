@@ -1,0 +1,14 @@
+Package: neatr
+Type: Package
+Title: NeuroEvolution of Augmenting Topologies
+Version: 0.0.0.9000
+Authors@R: c(person("Adriano", "Passos", email="adriano.utfpr@gmail.com", role=c("aut","cre")))
+Description: More about what it does (maybe more than one line)
+    Use four spaces when indenting paragraphs within the Description.
+Depends: R (>= 3.4.0), purrr(>= 0.2.3)
+License: GPL-3
+LazyData: TRUE
+Imports: ggplot2,
+    viridis,
+    methods
+RoxygenNote: 6.0.1

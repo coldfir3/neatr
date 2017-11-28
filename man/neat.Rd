@@ -8,7 +8,8 @@ neat(fn, starting_pop, max_generations = 100, solution_tolerance = 0.001,
   n_stagnate = 15, print_level = 1, kill_percentage = 0.2,
   number_for_kill = 5, selection.pressure = 2, em_rate = 0.25,
   wm_rate = 0.9, lm_rate = 0.4, nm_rate = 0.04, wm_power = 2.5,
-  wm_limit = 10, threshold = 6, c1 = 2, c2 = 2, c3 = 1)
+  wm_limit = 10, threshold = 6, c1 = 2, c2 = 2, c3 = 1,
+  return_history = FALSE)
 }
 \arguments{
 \item{fn}{Function with a single neural network as input and a numeric single fitness value as output}
@@ -30,13 +31,7 @@ from the mating proccess.}
 \item{number_for_kill}{Numerical value for minimal population size for killing}
 
 \item{selection.pressure}{Numerical value used as exponent when evaluating the shared fitness,
- higher numbers will make more elite populations reproduce more often
-
-TODO:
-  melhorar as mutacoes, ver codigo matlab, mas a ideia e garantir que a mutacao ocorra caso seja sorteada
-  rever codigo de crossover
-  melhorar output da funcao neat
-  criar funcao de pos processamento}
+higher numbers will make more elite populations reproduce more often}
 
 \item{em_rate, wm_rate, lm_rate, nm_rate}{Numerical in [0,1] of the probability of mutations
 \itemize{
@@ -59,6 +54,35 @@ from an unifor distribution [-wm_power, wm_power]}
  \item c2 = weight of disjoint genes
  \item c3 = weight of average weight differences
 }}
+
+\item{return_history}{Logical indicating if the whole history of elite individuals should be returned
+ (default: FALSE)
+
+TODO:
+  melhorar as mutacoes, ver codigo matlab, mas a ideia e garantir que a mutacao ocorra caso seja sorteada
+  rever codigo de crossover
+  melhorar output da funcao neat
+  criar funcao de pos processamento
+
+ ORIGINAL ARTICLE PARAMETERS (IMPLEMENT)
+
+ OK - Weight Mutation Range: The maximum magnitude of a mutation that changes the weight of a connection (Section 3.1).
+ OK - c1: Coefficient representing how important excess genes are in measuring compatibility (equation 3.1).
+ OK - c2: Coefficient for disjoint genes (equation 3.1).
+ OK - c3: Coefficient for average weight difference (equation 3.1).
+ OK - Ct: Compatibility threshold (equation 3.1); when dynamic thresholding is used, this variable determines the starting threshold.
+ Survival Threshold: Percentage of each species allowed to reproduce (Section 3.3).
+ Mutate Only Probability: Probability that a reproduction will only result from mutation and not crossover.
+ Add Node Probability: Probability a new node gene will be added to the genome (Section 3.1).
+ Add Link Probability: Probability a new connection will be added (Section 3.1).
+ Interspecies Mating Rate: Percentage of crossovers allowed to occur between parents of different species (Section 3.3).
+ Mate By Choosing Probability: Probability that genes will be chosen one at a time from either parent during crossover (Section 3.2).
+ Mate By Averaging Probability: Probability that matching genes will be averaged during crossover (Section 3.2).
+ Mate Only Probability: Probability an offspring will be created only through crossover without mutation.
+ Recurrent Connection Probability: Probability a new connection will be recurrent.
+ Population Size: Number of networks in the population.
+ Maximum Stagnation: Maximum number of generations a species is allowed to stay the same fitness before it is removed. In competitive coevolution, the worst species is removed if it has been around this many generations (Section 3.3).
+ Target Number of Species: Desired number of species in the population; used only in dynamic compatibility thresholding (Section 3.3).}
 }
 \description{
 NeuralEvolution of Augmenting Topologies
@@ -76,7 +100,7 @@ fn <- function(nn){
 npop = 30
 max_generations = 20
 starting_pop <- populate.nn(npop, 2, 1)
-optimal_pop <- neat(fn, starting_pop, max_generations)
+optimal_pop <- neat(fn, starting_pop, max_generations, return_history = TRUE)
 
 
 \dontrun{
@@ -85,5 +109,10 @@ optimal_pop <- neat(fn, starting_pop, max_generations)
  max_generations = 100
  starting_pop <- populate.nn(npop, 2, 1)
  optimal_pop <- neat(fn, starting_pop, max_generations)
+}
+
+\dontrun{ # debug routine
+r <- unclass(lsf.str(envir = asNamespace("neatr"), all = T))
+for(name in r) eval(parse(text=paste0(name, '<-neatr:::', name)))
 }
 }

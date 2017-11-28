@@ -30,12 +30,35 @@
 #' @param number_for_kill Numerical value for minimal population size for killing
 #' @param selection.pressure Numerical value used as exponent when evaluating the shared fitness,
 #'  higher numbers will make more elite populations reproduce more often
+#' @param return_history Logical indicating if the whole history of elite individuals should be returned
+#'  (default: FALSE)
 #'
 #' TODO:
 #'   melhorar as mutacoes, ver codigo matlab, mas a ideia e garantir que a mutacao ocorra caso seja sorteada
 #'   rever codigo de crossover
 #'   melhorar output da funcao neat
 #'   criar funcao de pos processamento
+#'
+#'  ORIGINAL ARTICLE PARAMETERS (IMPLEMENT)
+#'
+#'  OK - Weight Mutation Range: The maximum magnitude of a mutation that changes the weight of a connection (Section 3.1).
+#'  OK - c1: Coefficient representing how important excess genes are in measuring compatibility (equation 3.1).
+#'  OK - c2: Coefficient for disjoint genes (equation 3.1).
+#'  OK - c3: Coefficient for average weight difference (equation 3.1).
+#'  OK - Ct: Compatibility threshold (equation 3.1); when dynamic thresholding is used, this variable determines the starting threshold.
+#'  Survival Threshold: Percentage of each species allowed to reproduce (Section 3.3).
+#'  Mutate Only Probability: Probability that a reproduction will only result from mutation and not crossover.
+#'  Add Node Probability: Probability a new node gene will be added to the genome (Section 3.1).
+#'  Add Link Probability: Probability a new connection will be added (Section 3.1).
+#'  Interspecies Mating Rate: Percentage of crossovers allowed to occur between parents of different species (Section 3.3).
+#'  Mate By Choosing Probability: Probability that genes will be chosen one at a time from either parent during crossover (Section 3.2).
+#'  Mate By Averaging Probability: Probability that matching genes will be averaged during crossover (Section 3.2).
+#'  Mate Only Probability: Probability an offspring will be created only through crossover without mutation.
+#'  Recurrent Connection Probability: Probability a new connection will be recurrent.
+#'  Population Size: Number of networks in the population.
+#'  Maximum Stagnation: Maximum number of generations a species is allowed to stay the same fitness before it is removed. In competitive coevolution, the worst species is removed if it has been around this many generations (Section 3.3).
+#'  Target Number of Species: Desired number of species in the population; used only in dynamic compatibility thresholding (Section 3.3).
+#'
 #'
 #' @export
 #' @examples
@@ -51,7 +74,7 @@
 #' npop = 30
 #' max_generations = 20
 #' starting_pop <- populate.nn(npop, 2, 1)
-#' optimal_pop <- neat(fn, starting_pop, max_generations)
+#' optimal_pop <- neat(fn, starting_pop, max_generations, return_history = TRUE)
 #'
 #'
 #' \dontrun{
@@ -61,11 +84,17 @@
 #'  starting_pop <- populate.nn(npop, 2, 1)
 #'  optimal_pop <- neat(fn, starting_pop, max_generations)
 #' }
+#'
+#' \dontrun{ # debug routine
+#' r <- unclass(lsf.str(envir = asNamespace("neatr"), all = T))
+#' for(name in r) eval(parse(text=paste0(name, '<-neatr:::', name)))
+#' }
 neat <- function(fn, starting_pop,
                  max_generations = 100, solution_tolerance = 0.001, n_stagnate = 15, print_level = 1,
                  kill_percentage = 0.2, number_for_kill = 5, selection.pressure = 2,
                  em_rate = 0.25, wm_rate = 0.9, lm_rate = 0.4, nm_rate = 0.04, wm_power = 2.5, wm_limit = 10,
-                 threshold = 6, c1 = 2, c2 = 2, c3 = 1){
+                 threshold = 6, c1 = 2, c2 = 2, c3 = 1,
+                 return_history = FALSE){
 
 
   # initializing the genome and history based on initial population
@@ -76,7 +105,8 @@ neat <- function(fn, starting_pop,
   for(gen in 1:max_generations){
 
     ### Speciate nn_pop and update species_history
-    spec <- speciate(nn_pop, species_history[[gen-1]], threshold, c1, c2 , c3)
+    #spec <- speciate(nn_pop, species_history[[gen-1]]$reference, threshold, c1, c2 , c3)
+    spec <- speciate_kmeans(nn_pop, species_history[[gen-1]]$reference, 10)
     species <- spec$species
     nn_pop <- species %>% unique %>% sort %>% map(function(x){
       res <- nn_pop[species == x]
@@ -84,7 +114,7 @@ neat <- function(fn, starting_pop,
       res})
     fitness <- nn_pop %>% map(function(x) map_dbl(x, fn))
     species_history <- c(species_history, list(NULL))
-    species_history[[gen]]$reference <- spec$reference_nn
+    species_history[[gen]]$reference <- spec$nn_reference
     species_history[[gen]]$size <- table(spec$species)
     species_history[[gen]]$fitness <- fitness %>% map(summary) %>% do.call(rbind,.) %>% as.data.frame
 
@@ -120,7 +150,27 @@ neat <- function(fn, starting_pop,
     cat('generation', gen, 'maximum fitness:', max(species_history[[gen]]$fitness$Max.), '\toffsprings:', unlist(n_offspring) + 1, '\n')
   }
 
-  list(nn_pop = nn_pop, fitness = fitness, species_history = species_history) # save elite fitness too?
+#  list(nn_pop = nn_pop, fitness = fitness, species_history = species_history) # save elite fitness too?
+
+  elite_fitness <-
+    species_history %>%
+    map('fitness') %>%
+    map('Max.') %>%
+    map(function(x){length(x) <- length(elite_pop); x}) %>%
+    (function(x){x <- do.call(rbind, x) %>% as.data.frame(); names(x) <- paste0('S', 1:length(elite_pop)); x})
+  elite_individuals <-
+    species_history %>%
+    map('elite')
+  population_size <-
+    species_history %>%
+    map('size') %>%
+    map(function(x){length(x) <- length(elite_pop); x}) %>%
+    (function(x){x <- do.call(rbind, x) %>% as.data.frame(); names(x) <- paste0('S', 1:length(elite_pop)); x})
+
+  if(return_history)
+    list(individuals = elite_individuals, size = population_size, fitness = elite_fitness)
+  else
+    list(individuals = elite_individuals[[gen]], size = population_size[gen,], fitness = elite_fitness[gen,])
 
 }
 

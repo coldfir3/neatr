@@ -1,9 +1,9 @@
-speciate <- function(nn_pop, species_history = NULL, threshold, c1, c2, c3){
+speciate <- function(nn_pop, nn_reference = NULL, threshold, c1, c2, c3){
 
-  if(is.null(species_history))
+  if(is.null(nn_reference))
     nn_refs <- nn_pop[1]
   else
-    nn_refs <- species_history$reference
+    nn_refs <- nn_reference
 
   species <- NULL
 
@@ -22,7 +22,7 @@ speciate <- function(nn_pop, species_history = NULL, threshold, c1, c2, c3){
 
   class(nn_refs) <- 'nnpop'
 
-  list(reference_nn = nn_refs, species = species)
+  list(nn_reference = nn_refs, species = species)
 }
 
 delta <- function(nn, nn_ref, c1, c2, c3){
@@ -78,7 +78,7 @@ speciate_weights <- function(nn_pop, species_history = NULL, threshold, c3){
 
   class(nn_refs) <- 'nnpop'
 
-  list(reference_nn = nn_refs, species = species)
+  list(nn_reference = nn_refs, species = species)
 }
 
 delta_net_weights <- function(nn, nn_ref, c3){

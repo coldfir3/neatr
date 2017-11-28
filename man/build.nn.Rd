@@ -2,7 +2,7 @@
 % Please edit documentation in R/build.nn.R
 \name{build.nn}
 \alias{build.nn}
-\title{Builds an Neural Network object}
+\title{Builds a Neural Network object}
 \usage{
 build.nn(inputs, outputs, hiddens = 0, weights = NULL,
   weight_range = c(-1, 1), enable_rate = 0.7)
@@ -25,7 +25,7 @@ upper bounds for the random weight generation}
 neural network object
 }
 \description{
-Builds an Neural Network object
+Builds a Neural Network object
 }
 \examples{
 build.nn(2, 1, enable_rate = 1) \%>\% plot

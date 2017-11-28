@@ -51,3 +51,140 @@ c.nnpop <- function(...){
 
   nn_pop
 }
+
+#' @export
+subset.nnpop <- function(x, subset, ...){
+
+  population <- x[subset]
+  class(population) <- 'nnpop'
+
+  population
+}
+
+#' @export
+mean.nnpop <- function(x, trim = 0, na.rm = FALSE, ...){
+
+  population <- x
+  gene_pool <- neatr:::build_gene_pool(population)
+
+  weights <-
+    population %>%
+    map(neatr:::sequentiate, gene_pool, zero2na = FALSE, na.rm = TRUE) %>%
+    do.call(rbind,.) %>%
+    apply(2, mean, na.rm = TRUE)
+
+  gene_pool$links$weights <- weights
+  gene_pool
+}
+
+#' @export
+median_nnpop <- function(x, trim = 0, na.rm = FALSE, ...){ #make this generic for stats::median
+
+  population <- x
+  gene_pool <- neatr:::build_gene_pool(population)
+
+  weights <-
+    population %>%
+    map(neatr:::sequentiate, gene_pool, zero2na = FALSE, na.rm = TRUE) %>%
+    do.call(rbind,.) %>%
+    apply(2, median, na.rm = TRUE)
+
+  gene_pool$links$weights <- weights
+  gene_pool
+}
+
+#' @export
+sd.nnpop <- function(x, trim = 0, na.rm = FALSE, ...){
+
+  population <- x
+  gene_pool <- neatr:::build_gene_pool(population)
+
+  weights <-
+    population %>%
+    map(neatr:::sequentiate, gene_pool, zero2na = FALSE, na.rm = TRUE) %>%
+    do.call(rbind,.) %>%
+    apply(2, sd, na.rm = TRUE)
+
+  gene_pool$links$weights <- weights
+  gene_pool
+}
+
+
+#' @export
+plot.nnpop <- function(x, y, ..., animate = FALSE){
+
+  nnpop <- x
+  names(nnpop) <- 1:length(nnpop)
+
+  center <- function(nn){
+    tab <- stats::aggregate(nn$nodes$number, list(nn$nodes$layer), mean) %>% cbind(table(nn$nodes$layer))
+
+    mu <- tab %>% with(rep(x, Freq))
+    mu[order(nn$nodes$layer)] <- mu
+    mu.in <- tab$x[match(nn$links$input.layer, tab$Group.1)]
+    mu.out <- tab$x[match(nn$links$output.layer, tab$Group.1)]
+
+    nn$nodes$posi <- nn$nodes$number - mu
+    nn$links$input.number <- nn$links$input.number - mu.in
+    nn$links$output.number <- nn$links$output.number - mu.out
+
+    class(nn) <- 'nn'
+    nn
+  }
+
+  nnpop <- nnpop %>% map(center)
+
+  links <- nnpop %>% map('links') %>% dplyr::bind_rows(.id = "id")
+  nodes <- nnpop %>% map('nodes') %>% dplyr::bind_rows(.id = "id")
+
+  storage.mode(links$id) <- 'numeric'
+  storage.mode(nodes$id) <- 'numeric'
+  links$enabled <- factor(1 - as.integer(links$enabled), levels = c(0,1), labels = c(TRUE, FALSE))
+
+  # plot the nodes
+  if(animate)
+    p <- ggplot2::ggplot(nodes, ggplot2::aes_string(x = 'layer', y = 'posi', shape = 'type')) +
+      ggplot2::geom_point(size = 3, ggplot2::aes_string(frame = 'id'))
+  else
+    p <- ggplot2::ggplot(nodes, ggplot2::aes_string(x = 'layer', y = 'posi', shape = 'type')) +
+      ggplot2::geom_point(size = 3) +
+      ggplot2::facet_wrap(~id)
+
+  # plot the links
+  if(animate)
+  p <- p +
+    ggplot2::geom_segment(
+      ggplot2::aes_string(
+        x = 'input.layer',
+        y = 'input.number',
+        xend = 'output.layer',
+        yend = 'output.number',
+        col = 'weights',
+        lty = 'enabled',
+        frame = 'id'),
+      data = links,
+      inherit.aes = FALSE, alpha = 0.5, lwd = 1.2)
+  else
+    p <- p +
+    ggplot2::geom_segment(
+      ggplot2::aes_string(
+        x = 'input.layer',
+        y = 'input.number',
+        xend = 'output.layer',
+        yend = 'output.number',
+        col = 'weights',
+        lty = 'enabled'),
+      data = links,
+      inherit.aes = FALSE, alpha = 0.5, lwd = 1.2)
+
+  # set the theme
+  p <- p +
+    ggplot2::scale_shape_manual('Type', values = c(7,2,6,1)) +
+    ggplot2::scale_colour_gradient2('Weight') +
+    ggplot2::theme_void() +
+    ggplot2::scale_linetype_manual('Enabled', values = c(1,0))
+
+  p
+
+}
+

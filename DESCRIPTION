@@ -10,5 +10,9 @@ License: GPL-3
 LazyData: TRUE
 Imports: ggplot2,
     viridis,
-    methods
+    methods,
+    flexclust,
+    dplyr,
+    Rcpp
 RoxygenNote: 6.0.1
+LinkingTo: Rcpp

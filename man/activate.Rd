@@ -2,7 +2,7 @@
 % Please edit documentation in R/activate.R
 \name{activate}
 \alias{activate}
-\title{Activates a neural nnwork}
+\title{Activates a neural network}
 \usage{
 activate(input, nn, act_fun = sigmoid)
 }
@@ -17,7 +17,7 @@ activate(input, nn, act_fun = sigmoid)
 Numerical Vector of the output for the Neural Network
 }
 \description{
-Activates a neural nnwork
+Activates a neural network
 }
 \examples{
 build.nn(2, 1, enable_rate = 1) \%>\% activate(c(1,1), .)

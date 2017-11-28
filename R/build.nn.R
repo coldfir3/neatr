@@ -1,4 +1,4 @@
-#' Builds an Neural Network object
+#' Builds a Neural Network object
 #'
 #' @param inputs,outputs Numeric indicating the number of inputs and outputs
 #' @param hiddens Numeric Vector indicating the number of hidden neurons per layer (optional)
@@ -26,7 +26,7 @@ build.nn <- function(inputs, outputs, hiddens = 0, weights = NULL, weight_range 
     stop('network must have at least 1 output')
 
   if(length(weight_range) == 1)
-    weight_range <- rep(weight_range, 2)
+    weight_range <- rep(weight_range, 2) * c(-1,1)
   else if(length(weight_range) != 2)
     stop('weight_range must be of lenght 1 or 2')
 
@@ -43,51 +43,43 @@ build.nn <- function(inputs, outputs, hiddens = 0, weights = NULL, weight_range 
     rep(0, inputs + 1),
     rep(1, outputs),
     rep(1:length(hiddens)/(length(hiddens)+1), hiddens)
-  )
+  ) %>% round(3)
 
-  number <- 0:(length(type) - 1)
+  if(all(hiddens == 0))
+    number <- c(
+      0,
+      1:inputs,
+      1:outputs
+    )
+  else if(any(hiddens == 0))
+    stop('all hiddens must be different of 0')
+  else
+    number <- c(
+      0,
+      1:inputs,
+      1:outputs,
+      (hiddens %>% map(function(x) seq(from = 1, to = x, by = 1)) %>% unlist)
+    )
 
   nodes <- data.frame(
-    number = number,
     type = type,
+    number = number,
     layer = layer
   )
 
-  links <- rbind(
-    data.frame(expand.grid(
-      input = number[nodes$type == 'input'],
-      output = number[nodes$type == 'output']
-    )),
-    data.frame(expand.grid(
-      input = number[nodes$type == 'hidden'],
-      output = number[nodes$type == 'output']
-    )),
-    data.frame(expand.grid(
-      input = number[nodes$type == 'input'],
-      output = number[nodes$type == 'hidden']
-    ))
-  )
-
-  number <- 1:nrow(links)
+  links <- get_possible_links(nodes)
 
   if(is.null(weights))
-    weights <- stats::runif(number, weight_range[1], weight_range[2])
-  else if(number > length(weights)){
-    length(weights) <- number
-    weights[which(is.na(weights))] <- stats::runif(sum(is.na(weights)), weight_range[1], weight_range[2])
+    links$weights <- stats::runif(nrow(links), weight_range[1], weight_range[2])
+  else if(nrow(links) > length(weights)){
+    length(weights) <- nrow(links)
+    links$weights[which(is.na(weights))] <- stats::runif(sum(is.na(weights)), weight_range[1], weight_range[2])
   }
-  else if(number < length(weights)){
-    wegiths <- wegiths[1:number]
+  else if(nrow(links) < length(weights)){
+    links$wegiths <- wegiths[1:nrow(links)]
   }
 
-  enabled <- stats::runif(number) < enable_rate
-
-  links <- cbind(
-    number,
-    links,
-    weights,
-    enabled
-  )
+  links$enabled <- stats::runif(nrow(links)) < enable_rate
 
   nn <- list(
     nodes = nodes,
@@ -107,54 +99,80 @@ print.nn <- function(x, ...){
   cat('Neural Network: ',
       nrow(nn$nodes), ' nodes (',
       sum(nn$nodes$type == 'input'), ' in, ',
+      sum(nn$nodes$type == 'bias'), ' bias, ',
       sum(nn$nodes$type == 'hidden'), ' hid, ',
       sum(nn$nodes$type == 'output'), ' out); ',
       nrow(nn$links), ' links (',
       sum(nn$links$enable), ' enabled, newest gene: genotype ',
-      max(nn$links$number), ')\n',
+#      max(nn$links$number),
+      ')\n',
       sep = '')
 }
 
 #' @export
 c.nn <- function(...){
 
-  nn_pop <- purrr::flatten(c(list(...)))
+  nn_pop <- (c(list(...)))
   class(nn_pop) <- 'nnpop'
 
   nn_pop
 }
 
 #' @export
-plot.nn <- function(x, y, ...){ ### FIX NEEDED: change this to simply plot and create an object of class S3 for nn
+plot.nn <- function(x, y, ...){
 
   nn <- x
 
-  layer <- nn$nodes$layer
-  layer[order(layer)] <- rep(0:(length(unique(layer))-1), table(layer))
-  layer -> nn$nodes$layer
+  nn$links$enabled <- factor(1 - as.integer(nn$links$enabled), levels = c(0,1), labels = c(TRUE, FALSE))
 
-  ord <- 1:nrow(nn$nodes)
-  nn$nodes <- nn$nodes[order(nn$nodes$layer),]
-  posi <- NULL
-  for(p in unique(nn$nodes$layer))
-    posi <- c(posi, 1:table(nn$nodes$layer)[p+1] - mean(1:table(nn$nodes$layer)[p+1]))
-  nn$nodes$posi <- posi
-  nn$nodes <- nn$nodes[order(ord),]
+  tab <- stats::aggregate(nn$nodes$number, list(nn$nodes$layer), mean) %>% cbind(table(nn$nodes$layer))
 
-  nn$links$enable <- factor(1 - as.integer(nn$links$enable), levels = c(0,1), labels = c(TRUE, FALSE))
+  mu <- tab %>% with(rep(x, Freq))
+  mu[order(nn$nodes$layer)] <- mu
+  mu.in <- tab$x[match(nn$links$input.layer, tab$Group.1)]
+  mu.out <- tab$x[match(nn$links$output.layer, tab$Group.1)]
 
+
+  nn$nodes$posi <- nn$nodes$number - mu
+  nn$links$input.number <- nn$links$input.number - mu.in
+  nn$links$output.number <- nn$links$output.number - mu.out
+
+  # plot the nodes
   p <- ggplot2::ggplot(nn$nodes, ggplot2::aes_string(x = 'layer', y = 'posi', shape = 'type')) +
-    ggplot2::geom_segment(ggplot2::aes_string(x = 'In.layer', y = 'In.posi', xend = 'Out.layer', yend = 'Out.posi', col = 'w', lty = 'on'),
-                          data = cbind(In = nn$nodes[nn$links$input %>% map(`==`, nn$nodes$number) %>% map_dbl(which), c('layer', 'posi')],
-                                       Out = nn$nodes[nn$links$output %>% map(`==`, nn$nodes$number) %>% map_dbl(which), c('layer', 'posi')],
-                                       w = nn$links$weight,
-                                       on = nn$links$enable),
-                          inherit.aes = FALSE, alpha = 0.5, lwd = 1.2) +
-    ggplot2::geom_point(size = 3) +
+    ggplot2::geom_point(size = 3)
+
+  # plot the links
+  p <- p +
+    ggplot2::geom_segment(
+      ggplot2::aes_string(
+        x = 'input.layer',
+        y = 'input.number',
+        xend = 'output.layer',
+        yend = 'output.number',
+        col = 'weights',
+        lty = 'enabled'),
+      data = nn$links,
+      inherit.aes = FALSE, alpha = 0.5, lwd = 1.2)
+
+  # set the theme
+  p +
     ggplot2::scale_shape_manual('Type', values = c(7,2,6,1)) +
-    viridis::scale_color_viridis('Weight') + ggplot2::theme_void() +
+    #viridis::scale_color_viridis('Weight') +
+    ggplot2::scale_colour_gradient2('Weight') +
+    ggplot2::theme_void() +
     ggplot2::scale_linetype_manual('Enabled', values = c(1,0))
 
-  p
 }
 
+#' @export
+'==.nn' <- function(nna, nnb){
+  if(any(dim(nna$nodes) != dim(nnb$nodes)))
+    return(FALSE)
+  if(any(dim(nna$links) != dim(nnb$links)))
+    return(FALSE)
+  nodes_equal <- all(nna$nodes == nnb$nodes)
+  links_equal <- all(nna$links == nnb$links)
+  nodes_equal & links_equal
+}
+
+LINKS_STRUCTURE = c('input.number', 'input.layer', 'output.number', 'output.layer')
